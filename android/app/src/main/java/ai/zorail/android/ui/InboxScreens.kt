@@ -22,11 +22,13 @@ import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.MarkEmailUnread
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -40,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  * The inbox list — the app's home. Rows are 64dp+ so they are comfortable
  * one-handed, which is the main reason this is not the web layout.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxesScreen(vm: ZorailViewModel, onOpen: (String) -> Unit) {
     val state by vm.inboxes.collectAsStateWithLifecycle()
@@ -72,15 +75,22 @@ fun InboxesScreen(vm: ZorailViewModel, onOpen: (String) -> Unit) {
                 "Send a message to anything@$domain on port ${vm.smtpPort} and it will appear here.",
             )
 
-            else -> LazyColumn {
-                items(state.inboxes, key = { it.inbox }) { ib ->
-                    InboxRow(
-                        address = ib.inbox,
-                        count = ib.messageCount,
-                        when_ = relativeTime(ib.lastReceived.orEmpty()),
-                        onClick = { onOpen(ib.inbox) },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            // Pull-to-refresh, because on a phone that is how a mail list is
+            // expected to work; the toolbar button stays for accessibility.
+            else -> PullToRefreshBox(
+                isRefreshing = state.loading,
+                onRefresh = vm::refreshInboxes,
+            ) {
+                LazyColumn {
+                    items(state.inboxes, key = { it.inbox }) { ib ->
+                        InboxRow(
+                            address = ib.inbox,
+                            count = ib.messageCount,
+                            when_ = relativeTime(ib.lastReceived.orEmpty()),
+                            onClick = { onOpen(ib.inbox) },
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
                 }
             }
         }
@@ -131,6 +141,7 @@ private fun InboxRow(address: String, count: Int, when_: String, onClick: () -> 
 }
 
 /** One inbox's messages. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxScreen(vm: ZorailViewModel, onBack: () -> Unit, onOpenMessage: (String) -> Unit) {
     val state by vm.inbox.collectAsStateWithLifecycle()
@@ -164,15 +175,20 @@ fun InboxScreen(vm: ZorailViewModel, onBack: () -> Unit, onOpenMessage: (String)
                 Icons.Default.MarkEmailUnread, "This inbox is empty",
             )
 
-            else -> LazyColumn {
-                items(state.messages, key = { it.id }) { m ->
-                    MessageRow(
-                        from = displayFrom(m.from.ifBlank { m.envFrom }),
-                        subject = m.subject.ifBlank { "(no subject)" },
-                        when_ = relativeTime(m.receivedAt),
-                        onClick = { onOpenMessage(m.id) },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            else -> PullToRefreshBox(
+                isRefreshing = state.loading,
+                onRefresh = vm::refreshInbox,
+            ) {
+                LazyColumn {
+                    items(state.messages, key = { it.id }) { m ->
+                        MessageRow(
+                            from = displayFrom(m.from.ifBlank { m.envFrom }),
+                            subject = m.subject.ifBlank { "(no subject)" },
+                            when_ = relativeTime(m.receivedAt),
+                            onClick = { onOpenMessage(m.id) },
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
                 }
             }
         }
