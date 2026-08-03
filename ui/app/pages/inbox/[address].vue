@@ -39,9 +39,18 @@ watch(address, (a) => { if (a) z.enterInbox(a) }, { immediate: true })
       </Tip>
     </header>
 
+    <!--
+      Two columns on desktop. Below 900px there is only room for one, so the
+      pane swaps: the list until a message is open, then the reader. Previously
+      the reader was simply hidden at this width, which meant tapping a message
+      on a phone appeared to do nothing at all.
+    -->
     <div class="grid min-h-0 flex-1 grid-cols-[380px_1fr] max-[900px]:grid-cols-1">
       <!-- message list -->
-      <section class="flex min-h-0 flex-col border-r">
+      <section
+        class="flex min-h-0 flex-col border-r"
+        :class="state.current ? 'max-[900px]:hidden' : ''"
+      >
         <div class="flex-none border-b border-border-subtle p-3">
           <div class="relative">
             <Search class="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -84,7 +93,18 @@ watch(address, (a) => { if (a) z.enterInbox(a) }, { immediate: true })
       </section>
 
       <!-- reader -->
-      <section class="flex min-h-0 flex-col max-[900px]:hidden">
+      <section
+        class="flex min-h-0 flex-col"
+        :class="state.current ? '' : 'max-[900px]:hidden'"
+      >
+        <!-- Phone-only way back to the list; desktop keeps both panes visible. -->
+        <button
+          v-if="state.current"
+          class="hidden min-h-[44px] flex-none items-center gap-2 border-b px-4 text-[13px] text-muted-foreground transition-colors active:bg-accent max-[900px]:flex"
+          @click="z.closeMessage()"
+        >
+          <ArrowLeft class="size-4" /> All messages
+        </button>
         <div v-if="state.loadingMsg && !state.current" class="m-auto">
           <span class="block size-4 animate-spin rounded-full border-2 border-border border-t-muted-foreground" />
         </div>

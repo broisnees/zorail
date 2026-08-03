@@ -192,6 +192,15 @@ async function openMessage(id: string) {
   })
   state.loadingMsg = false
 }
+/**
+ * Closes the open message without leaving the inbox. On phones the reader is a
+ * full-screen pane over the list rather than a column beside it, so it needs a
+ * way back that does not also drop the inbox.
+ */
+function closeMessage() {
+  state.current = null
+  state.rawCache = ''
+}
 async function deleteMessage(id: string) {
   await guard(async () => {
     await call(`/messages/${enc(id)}`, { method: 'DELETE' })
@@ -456,7 +465,7 @@ function init() {
 export function useZorail() {
   return {
     state, init,
-    loadConfig, loadInboxes, loadMessages, openInbox, closeInbox, enterInbox, leaveInbox, setSection, openMessage, deleteMessage, clearInbox, search,
+    loadConfig, loadInboxes, loadMessages, openInbox, closeInbox, enterInbox, leaveInbox, setSection, openMessage, closeMessage, deleteMessage, clearInbox, search,
     attachmentURL, rawURL, generateAddress,
     markRead, isRead, inboxUnread, togglePin, isPinned, recentInboxes,
     setTheme, setAccent, setToken, toggleImages, toggleAuto, accentList,

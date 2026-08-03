@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"path"
 	"strconv"
@@ -88,6 +89,11 @@ func New(cfg *config.Config, store storage.Store, log *slog.Logger, deps *Deps) 
 
 	// Ingest (Cloudflare Email Worker / relay → Zorail).
 	mux.HandleFunc("POST /api/ingest", s.authn(model.ScopeManage, s.handleIngest))
+
+	// Cloudflare provisioning from the UI. Manage scope: these deploy Workers
+	// and rewrite DNS on the user's account.
+	mux.HandleFunc("POST /api/cloudflare/zones", s.authn(model.ScopeManage, s.handleCFZones))
+	mux.HandleFunc("POST /api/cloudflare/connect", s.authn(model.ScopeManage, s.handleCFConnect))
 
 	// Message reading (legacy-open when no token is configured).
 	mux.HandleFunc("GET /api/search", s.authRead(s.handleSearch))
@@ -187,6 +193,14 @@ func serveIndex(fsys fs.FS, w http.ResponseWriter) {
 func (s *Server) ListenAndServe() error {
 	s.log.Info("http listening", "addr", s.srv.Addr, "auth", s.cfg.APIToken != "")
 	return s.srv.ListenAndServe()
+}
+
+// Serve serves HTTP on an already-open listener, so a caller can bind first and
+// report the error itself — what the mobile embedding needs, since it must fail
+// fast on a port conflict rather than reporting success and erroring later.
+func (s *Server) Serve(l net.Listener) error {
+	s.log.Info("http listening", "addr", l.Addr().String(), "auth", s.cfg.APIToken != "")
+	return s.srv.Serve(l)
 }
 
 // Shutdown gracefully stops the server.

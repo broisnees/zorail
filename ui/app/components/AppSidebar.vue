@@ -7,23 +7,14 @@ import {
 import { Menu, MenuItem } from '@/components/ui/menu'
 import { Tip } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
-import type { Section } from '@/composables/useZorail'
+import { NAV as nav, isNavActive, type NavItem } from '@/composables/useNav'
 
 const z = useZorail()
 const { state } = z
 
 const route = useRoute()
-const nav: { key: Section; label: string; icon: LucideIcon; path: string }[] = [
-  { key: 'inboxes', label: 'Inboxes', icon: Inbox, path: '/' },
-  { key: 'addresses', label: 'Addresses', icon: AtSign, path: '/addresses' },
-  { key: 'domains', label: 'Domains', icon: Globe, path: '/domains' },
-  { key: 'keys', label: 'API keys', icon: KeyRound, path: '/keys' },
-  { key: 'settings', label: 'Settings', icon: Settings2, path: '/settings' },
-]
-function isActive(item: { key: Section; path: string }) {
-  // The inbox detail route (/inbox/…) still highlights Inboxes.
-  if (item.key === 'inboxes') return route.path === '/' || route.path.startsWith('/inbox')
-  return route.path === item.path
+function isActive(item: NavItem) {
+  return isNavActive(item, route.path)
 }
 
 const orgInitial = computed(() => (state.organization || 'Z').slice(0, 1).toUpperCase())
@@ -31,7 +22,9 @@ const userInitial = computed(() => (state.user?.email || '?').slice(0, 1).toUppe
 </script>
 
 <template>
-  <aside class="flex w-[228px] flex-none flex-col border-r bg-background max-[860px]:w-[58px]">
+  <!-- Hidden on phones: MobileNav takes over below `md`, so the icon rail no
+       longer eats a sixth of a 360px-wide screen. -->
+  <aside class="hidden w-[228px] flex-none flex-col border-r bg-background max-[860px]:w-[58px] md:flex">
     <!-- org switcher -->
     <div class="p-2.5">
       <Menu align="start" class="w-full">
