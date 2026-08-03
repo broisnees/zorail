@@ -122,12 +122,39 @@ does.
 
 ## Build
 
-One-time setup — Android SDK + NDK, then:
+### One-time toolchain setup
+
+Install the SDK command-line tools, then get the NDK **through `sdkmanager`**:
 
 ```sh
-export ANDROID_HOME="$HOME/Library/Android/sdk"   # wherever yours lives
-make android-tools                                # installs gomobile, runs gomobile init
+brew install --cask android-commandlinetools
+export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
+sdkmanager --install "ndk;28.2.13676358" "platforms;android-35" "build-tools;35.0.0"
+make android-tools    # installs gomobile + gobind, runs gomobile init
 ```
+
+Do **not** use the `android-ndk` Homebrew cask on macOS. It ships the NDK inside
+an `AndroidNDK*.app` bundle that arrives quarantined, so its `clang` cannot
+execute — `gomobile bind` fails with an opaque `cgo: exit status 2`, and opening
+the bundle in Finder gets you *"is damaged and can't be opened"*. That dialog is
+Gatekeeper, not corruption; **do not click "Move to Trash"**. Clearing it needs
+`sudo xattr -dr com.apple.quarantine <bundle>`, and once Gatekeeper has failed
+verification the bundle can become unreadable outright. `sdkmanager` sidesteps
+all of it — plain directories under `$ANDROID_HOME/ndk/`, never quarantined.
+
+Three more things that bite:
+
+- **`gomobile bind` needs `-androidapi`.** It defaults to API 16, which is below
+  the supported 21..35 range, so the build dies before compiling anything. The
+  Makefile pins 26 to match `minSdk`.
+- **`golang.org/x/mobile` must be a module dependency**, not just an installed
+  binary: `go get -tool golang.org/x/mobile/cmd/gobind`. Hence the `tool`
+  directive in `go.mod`.
+- **JDK version.** AGP 8.7 wants JDK 17–21. If your default `java` is newer, set
+  `org.gradle.java.home` in `android/gradle.properties`, and use the Gradle
+  wrapper (8.9) rather than a system Gradle 9.x, which AGP 8.7 rejects.
+
+### Building
 
 Then:
 

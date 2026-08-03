@@ -52,31 +52,42 @@ class ZorailService : Service() {
         startForegroundNotice(getString(R.string.notice_starting))
 
         val prefs = Prefs(this)
+        // Explicit setters, not Kotlin synthetic properties: gomobile emits
+        // getDBPath/setSMTPPort for the Go fields DBPath/SMTPPort, and the
+        // synthetic-property spelling of those acronyms is not worth guessing.
+        // Go's int becomes a Java long, hence toLong() on the ports.
         val opts = Mobile.newOptions().apply {
             // Scoped storage: filesDir is the only path reliably ours to write.
-            dbPath = File(filesDir, "zorail.db").absolutePath
-            domain = prefs.domain
-            smtpPort = prefs.smtpPort       // 2525 — binding <1024 needs root
-            httpPort = prefs.httpPort
-            bindPublic = prefs.bindPublic   // off unless the user opted in
-            apiToken = prefs.apiToken
-            allowedDomains = prefs.allowedDomains
-            retentionDays = prefs.retentionDays
+            setDBPath(File(filesDir, "zorail.db").absolutePath)
+            setDomain(prefs.domain)
+            setSMTPPort(prefs.smtpPort.toLong())   // 2525 — binding <1024 needs root
+            setHTTPPort(prefs.httpPort.toLong())
+            setBindPublic(prefs.bindPublic)        // off unless the user opted in
+            setAPIToken(prefs.apiToken)
+            setAllowedDomains(prefs.allowedDomains)
+            setRetentionDays(prefs.retentionDays.toLong())
         }
 
         try {
             val srv = Mobile.newServer(opts)
+            // Callbacks arrive on a Go goroutine, so hop to the main thread
+            // before touching notifications or service state.
             srv.start(object : Listener {
-                override fun onMail(inbox: String, msgId: String) =
+                override fun onMail(inbox: String, msgID: String) {
                     main.post { notifyMail(inbox) }
-
-                override fun onError(message: String) = main.post {
-                    Log.e(TAG, "server error: $message")
-                    updateNotice(getString(R.string.notice_error, message))
-                    stopSelf()
                 }
 
-                override fun onStopped() = main.post { Log.i(TAG, "server stopped") }
+                override fun onError(message: String) {
+                    main.post {
+                        Log.e(TAG, "server error: $message")
+                        updateNotice(getString(R.string.notice_error, message))
+                        stopSelf()
+                    }
+                }
+
+                override fun onStopped() {
+                    main.post { Log.i(TAG, "server stopped") }
+                }
             })
             server = srv
             acquireWifiLock()

@@ -78,6 +78,9 @@ clean:
 
 AAR      := android/app/libs/zorail.aar
 AAR_ARCH := android/arm64,android/arm
+# gomobile defaults to API 16, which is below its own supported 21..35 range and
+# fails before compiling. Keep this in step with minSdk in app/build.gradle.kts.
+AAR_API  := 26
 
 # One-time: install gomobile and generate its NDK bindings.
 android-tools:
@@ -91,7 +94,7 @@ android-aar:
 	@command -v gomobile >/dev/null || { echo "gomobile missing: run 'make android-tools'"; exit 1; }
 	@test -n "$$ANDROID_HOME" || { echo "ANDROID_HOME unset (install the SDK + NDK)"; exit 1; }
 	mkdir -p $(dir $(AAR))
-	gomobile bind -target=$(AAR_ARCH) -javapkg ai.zorail -trimpath -ldflags="-s -w" -o $(AAR) ./mobile
+	gomobile bind -target=$(AAR_ARCH) -androidapi $(AAR_API) -javapkg ai.zorail -trimpath -ldflags="-s -w" -o $(AAR) ./mobile
 
 # Build the debug APK.
 android: android-aar

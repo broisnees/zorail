@@ -1,7 +1,8 @@
 # Built by `make android-aar`, not source.
-app/libs/*.aar
+app/libs/
 
 .gradle/
 build/
 app/build/
+# Machine-specific SDK path, written by the Android tooling.
 local.properties
