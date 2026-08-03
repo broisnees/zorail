@@ -1,5 +1,6 @@
 package ai.zorail.android.ui
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -12,11 +13,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -32,6 +41,9 @@ private val TABS = listOf(
     Tab("settings", "Settings", Icons.Default.Tune),
 )
 
+/** Route prefixes that should keep the Mail tab highlighted. */
+private val MAIL_ROUTE_PREFIXES = listOf("inboxes", "inbox/", "message/")
+
 /**
  * The app shell: a bottom bar over a nav graph.
  *
@@ -46,17 +58,31 @@ fun ZorailApp() {
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
 
-    // The reader and the message list are pushed on top of the Mail tab; the bar
-    // stays visible so switching tabs mid-read still works.
+    val vm: ZorailViewModel = viewModel()
+    val snackbar = remember { SnackbarHostState() }
+    val clipboard = LocalClipboardManager.current
+
+    // A freshly minted address is only useful if you can paste it somewhere, so
+    // it goes to the clipboard and says so.
+    val minted by vm.minted.collectAsStateWithLifecycle()
+    LaunchedEffect(minted) {
+        val addr = minted ?: return@LaunchedEffect
+        clipboard.setText(AnnotatedString(addr))
+        snackbar.showSnackbar("$addr — copied")
+        vm.clearMinted()
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                 TABS.forEach { tab ->
-                    val selected = backStack?.destination?.hierarchy
-                        ?.any { it.route == tab.route } == true ||
-                        // Nested mail destinations keep the Mail tab lit.
-                        (tab.route == "inboxes" && (route == "inbox" || route == "message"))
+                    val selected = if (tab.route == "inboxes") {
+                        MAIL_ROUTE_PREFIXES.any { route?.startsWith(it) == true }
+                    } else {
+                        backStack?.destination?.hierarchy?.any { it.route == tab.route } == true
+                    }
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
@@ -74,26 +100,30 @@ fun ZorailApp() {
         },
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
-            val vm: ZorailViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
-
             NavHost(nav, startDestination = "inboxes") {
                 composable("inboxes") {
-                    InboxesScreen(vm) { address ->
-                        vm.openInbox(address)
-                        nav.navigate("inbox")
-                    }
+                    InboxesScreen(
+                        vm,
+                        onOpen = { address -> nav.navigate("inbox/${Uri.encode(address)}") },
+                        onNewAddress = { vm.generateAddress() },
+                    )
                 }
-                composable("inbox") {
+                // The address and id live in the route, not just in the view
+                // model: Android restores the nav back stack after the process is
+                // killed, but not the model, so a detail screen has to be able to
+                // say what it is showing and re-fetch it.
+                composable("inbox/{address}") { entry ->
+                    val address = Uri.decode(entry.arguments?.getString("address").orEmpty())
+                    LaunchedEffect(address) { vm.openInbox(address) }
                     InboxScreen(
                         vm,
                         onBack = { nav.popBackStack() },
-                        onOpenMessage = { id ->
-                            vm.openMessage(id)
-                            nav.navigate("message")
-                        },
+                        onOpenMessage = { id -> nav.navigate("message/$id") },
                     )
                 }
-                composable("message") {
+                composable("message/{id}") { entry ->
+                    val id = entry.arguments?.getString("id").orEmpty()
+                    LaunchedEffect(id) { vm.openMessage(id) }
                     ReaderScreen(vm, onBack = { nav.popBackStack() })
                 }
                 composable("domain") { CloudflareScreen(vm) }

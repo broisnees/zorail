@@ -141,6 +141,14 @@ class ZorailApi(private val port: Int, private val token: String) {
 
     private inline fun <reified T> decode(s: String): T = json.decodeFromString(s)
 
+    /**
+     * True once the server is accepting requests. The UI starts before the
+     * foreground service finishes binding its listeners, so something has to
+     * distinguish "not up yet" from "broken" — otherwise the first, inevitable
+     * connection-refused looks like a permanent failure.
+     */
+    suspend fun healthy(): Boolean = runCatching { request("/health") }.isSuccess
+
     suspend fun config(): ServerConfig = decode(request("/config"))
 
     suspend fun inboxes(): List<InboxSummary> = decode(request("/inboxes"))

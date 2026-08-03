@@ -161,6 +161,30 @@ Three more things that bite:
   `org.gradle.java.home` in `android/gradle.properties`, and use the Gradle
   wrapper (8.9) rather than a system Gradle 9.x, which AGP 8.7 rejects.
 
+### Performance: build release, not debug
+
+A debug Compose build is not representative and feels bad on a 120Hz screen.
+Measured on a Nothing Phone (1), same code, `adb shell dumpsys gfxinfo`:
+
+| | debug | release |
+| --- | --- | --- |
+| Janky frames | 6.05% | 0.41% |
+| 99th percentile frame | 200ms | 12ms |
+| 90th percentile frame | 9ms | 7ms |
+
+At 120Hz the budget is 8.3ms per frame, so release clears it at the 90th
+percentile while debug misses badly at the tail. Judge the feel on
+`assembleRelease` only. The release build here is signed with the debug key so it
+stays installable for local testing — replace that before distributing.
+
+To measure:
+
+```sh
+adb shell dumpsys gfxinfo ai.zorail.android reset
+# ...scroll around...
+adb shell dumpsys gfxinfo ai.zorail.android | grep -E "Janky|percentile"
+```
+
 ### Building
 
 Then:

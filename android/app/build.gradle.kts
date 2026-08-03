@@ -21,6 +21,10 @@ android {
 
     buildTypes {
         release {
+            // Signed with the debug key purely so a release build is installable
+            // for local testing; replace before distributing anything.
+            signingConfig = signingConfigs.getByName("debug")
+            isShrinkResources = true
             // The Go .aar is already stripped by gomobile; R8 only touches Kotlin.
             isMinifyEnabled = true
             proguardFiles(
