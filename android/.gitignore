@@ -1,0 +1,7 @@
+# Built by `make android-aar`, not source.
+app/libs/*.aar
+
+.gradle/
+build/
+app/build/
+local.properties

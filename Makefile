@@ -1,4 +1,4 @@
-.PHONY: build run up dev docker-dev docker-dev-down ui ui-install test tidy clean docker send-test watch setup doctor
+.PHONY: build run up dev docker-dev docker-dev-down ui ui-install test tidy clean docker send-test watch setup doctor android-tools android-aar android android-install
 
 BIN     := bin/zorail
 UI_DIR  := ui
@@ -69,4 +69,34 @@ docker:
 	docker build -t zorail:latest .
 
 clean:
-	rm -rf bin *.db *.db-wal *.db-shm $(UI_DIR)/.output $(UI_DIR)/.nuxt
+	rm -rf bin *.db *.db-wal *.db-shm $(UI_DIR)/.output $(UI_DIR)/.nuxt $(AAR)
+
+# ---------------------------------------------------------------------------
+# Android: the same Go core, bound as a library and run inside an app.
+# Needs the Android SDK + NDK; see docs/android.md.
+# ---------------------------------------------------------------------------
+
+AAR      := android/app/libs/zorail.aar
+AAR_ARCH := android/arm64,android/arm
+
+# One-time: install gomobile and generate its NDK bindings.
+android-tools:
+	go install golang.org/x/mobile/cmd/gomobile@latest
+	go install golang.org/x/mobile/cmd/gobind@latest
+	gomobile init
+
+# Bind ./mobile into an .aar the Gradle app consumes. Run `make ui` first if the
+# frontend changed — the WebView loads the SPA embedded in this library.
+android-aar:
+	@command -v gomobile >/dev/null || { echo "gomobile missing: run 'make android-tools'"; exit 1; }
+	@test -n "$$ANDROID_HOME" || { echo "ANDROID_HOME unset (install the SDK + NDK)"; exit 1; }
+	mkdir -p $(dir $(AAR))
+	gomobile bind -target=$(AAR_ARCH) -javapkg ai.zorail -trimpath -ldflags="-s -w" -o $(AAR) ./mobile
+
+# Build the debug APK.
+android: android-aar
+	cd android && ./gradlew assembleDebug
+
+# Build and push to the connected device.
+android-install: android-aar
+	cd android && ./gradlew installDebug

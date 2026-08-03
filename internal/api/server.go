@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"path"
 	"strconv"
@@ -187,6 +188,14 @@ func serveIndex(fsys fs.FS, w http.ResponseWriter) {
 func (s *Server) ListenAndServe() error {
 	s.log.Info("http listening", "addr", s.srv.Addr, "auth", s.cfg.APIToken != "")
 	return s.srv.ListenAndServe()
+}
+
+// Serve serves HTTP on an already-open listener, so a caller can bind first and
+// report the error itself — what the mobile embedding needs, since it must fail
+// fast on a port conflict rather than reporting success and erroring later.
+func (s *Server) Serve(l net.Listener) error {
+	s.log.Info("http listening", "addr", l.Addr().String(), "auth", s.cfg.APIToken != "")
+	return s.srv.Serve(l)
 }
 
 // Shutdown gracefully stops the server.

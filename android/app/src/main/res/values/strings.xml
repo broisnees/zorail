@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Zorail</string>
+    <string name="channel_status">Server status</string>
+    <string name="channel_mail">Incoming mail</string>
+    <string name="notice_starting">Starting…</string>
+    <string name="notice_running">Receiving mail on %1$s</string>
+    <string name="notice_error">Stopped: %1$s</string>
+    <string name="mail_title">New mail</string>
+</resources>
