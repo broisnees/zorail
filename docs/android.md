@@ -1,7 +1,14 @@
 # Zorail on Android
 
-Run the real Zorail server — inbound SMTP, JSON API, web UI, SQLite — inside an
-Android app, and receive mail on the handset.
+Run the real Zorail server — inbound SMTP, JSON API, SQLite — inside an Android
+app with a native Jetpack Compose UI, and receive mail on the handset.
+
+The mail engine is the Go core compiled to a real arm64 `.so`; the UI is Compose
+talking to that server over loopback. An earlier pass rendered the bundled web
+dashboard in a WebView instead — it worked, but that dashboard is a desktop
+layout, and on a phone it spent a sixth of the width on a sidebar rail, wrapped
+its own labels, and hid the message reader entirely below 900px. Reuse is worth a
+lot; it is not worth shipping a UI that feels borrowed.
 
 ## Is this doable?
 
@@ -83,7 +90,7 @@ implementations that must agree on parsing edge cases.
 
 | Approach | Verdict |
 | --- | --- |
-| **Go core via `gomobile bind` + Kotlin UI** | Recommended. ~330 lines of new Go, no core changes beyond two additive methods. Same code path as the server, so bugs are fixed once. |
+| **Go core via `gomobile bind` + native Compose UI** | What this ships. The mail engine is reused wholesale; only the UI is written twice, and a phone UI genuinely has to be different anyway. |
 | Pure Kotlin (Apache James / SubEthaSMTP + Ktor) | Full rewrite of everything above. Slower to build and permanently divergent. Performance is not the differentiator — a phone's mail volume is trivial either way. |
 | Rust + UniFFI | Also a rewrite. Faster than needed for this workload. |
 | Termux running the existing `zorail` binary | Zero effort, and the right way to *validate the idea tonight* — `pkg install golang`, `make build`, run it. Not shippable to anyone else. |
@@ -159,7 +166,7 @@ Three more things that bite:
 Then:
 
 ```sh
-make ui            # only if the frontend changed; the WebView loads this
+make ui            # only if the *web* dashboard changed; the app does not use it
 make android-aar   # binds ./mobile → android/app/libs/zorail.aar
 make android       # debug APK
 make android-install
@@ -186,9 +193,11 @@ under Termux — same code, same behaviour, none of the Gradle setup.
 ## Layout
 
 ```
-mobile/mobile.go       gomobile facade: Options, Listener, Server
-mobile/mobile_test.go  embedded-server lifecycle + real SMTP delivery
-android/               Gradle app: foreground service + WebView over the local UI
+mobile/mobile.go        gomobile facade: Options, Listener, Server
+mobile/mobile_test.go   embedded-server lifecycle + real SMTP delivery
+android/app/.../data    OkHttp client for the loopback JSON API
+android/app/.../ui      Compose screens: inboxes, messages, reader, domain, settings
+android/app/.../*.kt    foreground service, prefs, activity
 ```
 
 Two additive changes in the core support this: `notify.Hub.SubscribeAll` (arrival

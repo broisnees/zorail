@@ -90,6 +90,11 @@ func New(cfg *config.Config, store storage.Store, log *slog.Logger, deps *Deps) 
 	// Ingest (Cloudflare Email Worker / relay → Zorail).
 	mux.HandleFunc("POST /api/ingest", s.authn(model.ScopeManage, s.handleIngest))
 
+	// Cloudflare provisioning from the UI. Manage scope: these deploy Workers
+	// and rewrite DNS on the user's account.
+	mux.HandleFunc("POST /api/cloudflare/zones", s.authn(model.ScopeManage, s.handleCFZones))
+	mux.HandleFunc("POST /api/cloudflare/connect", s.authn(model.ScopeManage, s.handleCFConnect))
+
 	// Message reading (legacy-open when no token is configured).
 	mux.HandleFunc("GET /api/search", s.authRead(s.handleSearch))
 	mux.HandleFunc("GET /api/inboxes", s.authRead(s.handleListInboxes))
